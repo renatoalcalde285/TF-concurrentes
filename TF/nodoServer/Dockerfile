@@ -1,0 +1,8 @@
+#IMAGEN BASE
+FROM golang:alpine
+#Copiado del fuente a la nueva imagen
+COPY ./codeServer.go ./codenodehp-004.go
+#exponer los puertos
+EXPOSE 9002
+#poner en ejecución el algoritmo
+CMD ["go","run","codenodehp-004.go"]

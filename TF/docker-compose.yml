@@ -31,6 +31,15 @@ services:
     networks:
       my_network:
         ipv4_address: 172.20.0.4
+  server:
+    build:
+      context: ./NodoServer
+      dockerfile: Dockerfile
+    ports:
+      - "49002:9002"    
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.5
 networks:
   my_network:
     driver: bridge
