@@ -4,7 +4,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -24,7 +23,7 @@ func main() {
 	fmt.Printf("Mi IP es %s\n", hostIP)
 
 	addrs = []string{
-		"172.20.0.3", "172.20.0.4"}
+		"172.20.0.5"}
 
 	//Rol Servidor, Modo escucha
 	servicioHP()
@@ -62,6 +61,7 @@ func servicioHP() {
 		con, _ := ln.Accept()
 		go handlerHP(con)
 	}
+
 }
 func handlerHP(con net.Conn) {
 	defer con.Close()
@@ -70,13 +70,14 @@ func handlerHP(con net.Conn) {
 	fmt.Println(strNum)
 	num, _ := strconv.Atoi(strings.TrimSpace(strNum))
 	fmt.Printf("Recibimos el %d\n", num)
-	if num == 0 {
+	/*if num == 0 {
 		fmt.Println("Perdimos!!!!!")
 	} else {
 		enviarHP(num - 1)
-	}
+	}*/
 }
-func enviarHP(num int) {
+
+/*func enviarHP(num int) {
 	idx := rand.Intn(len(addrs)) //obtener el indice del próximo IP a enviar el número
 	fmt.Println(idx)
 	fmt.Printf("Enviando %d a %s\n", num, addrs[idx])
@@ -84,4 +85,4 @@ func enviarHP(num int) {
 	conn, _ := net.Dial("tcp", remoteDir)
 	defer conn.Close()
 	fmt.Fprintln(conn, num)
-}
+}*/
