@@ -35,6 +35,8 @@ services:
     build:
       context: ./NodoServer
       dockerfile: Dockerfile
+    volumes:
+      - ./dataset2M.csv:/app/dataset2M.csv
     ports:
       - "49002:9002"    
     networks:
