@@ -40,17 +40,17 @@ func main() {
 	fmt.Printf("IP del Servidor: %s\n", hostIP)
 
 	addrs = []string{
-		"172.20.0.2", "172.20.0.3", "172.20.0.4"}
+		"172.30.0.2", "172.30.0.3", "172.30.0.4"}
 
 	// Cargar el dataset
 	var err error
-	dataset, err = loadDataset("/app/dataset2M.csv", 100)
+	dataset, err = loadDataset("/app/dataset.csv", 2000000)
 	if err != nil {
 		log.Fatalf("Error cargando el dataset: %v", err)
 	}
 	fmt.Println("Dataset cargado correctamente.")
 
-	targetUserID := "30878"
+	targetUserID := "589967"
 
 	targetUserRatings, exists := dataset[targetUserID]
 	if !exists {
@@ -207,16 +207,35 @@ func manejarConexion(con net.Conn) {
 	defer con.Close()
 
 	// Leer datos enviados por el cliente
-	mensaje, err := bufio.NewReader(con).ReadString('\n')
-	if err != nil {
-		fmt.Printf("Error leyendo datos: %v\n", err)
-		return
+	reader := bufio.NewReader(con)
+	for {
+		// Leemos la línea que contiene el top 5
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			fmt.Printf("Error leyendo datos: %v\n", err)
+			return
+		}
+
+		// Procesar la línea recibida
+		parts := strings.Split(strings.TrimSpace(line), ",")
+		if len(parts) != 3 {
+			fmt.Printf("Datos no válidos: %s\n", line)
+			continue
+		}
+
+		userID := parts[0]
+		movieID := parts[1]
+		rating, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			fmt.Printf("Error al parsear el rating: %v\n", err)
+			continue
+		}
+
+		// Aquí puedes guardar los datos recibidos, por ejemplo:
+		fmt.Printf("Top 5 recibido - UserID: %s, MovieID: %s, Rating: %.2f\n", userID, movieID, rating)
+		// Guardar estos ratings en algún lugar para su procesamiento posterior
 	}
-
-	fmt.Println(mensaje)
-
-	// Procesar y responder al cliente
-	/*res := con.RemoteAddr().String()
-	fmt.Printf("Mensaje recibido de %s: %s\n", res, strings.TrimSpace(mensaje))
-	fmt.Fprintln(con, "Respuesta del servidor: Recibido")*/
 }
