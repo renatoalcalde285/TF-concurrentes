@@ -1,4 +1,3 @@
-// armando la red P2P
 package main
 
 import (
@@ -9,23 +8,33 @@ import (
 	"strings"
 )
 
-var addrs []string //arreglo: Bitácora de direcciones IP de los miembros de la red
-var hostIP string  // Almacenar la IP del nodo
+type Rating struct {
+	UserID  int
+	MovieID int
+	Rating  float64
+}
+
+type ClientData struct {
+	TargetUserID string
+	Data         []Rating
+}
+
+var addrs []string
+var hostIP string
 
 // Servicios
 const (
-	portHP = 9002 //Servicio HP
+	portHP = 9002
 )
 
 func main() {
-	//obtener la IP del nodo actual
 	hostIP = descubrirIP()
 	fmt.Printf("Mi IP es %s\n", hostIP)
 
 	addrs = []string{
-		"172.20.0.5"}
+		"172.20.0.5",
+	}
 
-	//Rol Servidor, Modo escucha
 	servicioHP()
 }
 
@@ -33,56 +42,97 @@ func descubrirIP() string {
 	var dirIP string = "127.0.0.1"
 	interfaces, _ := net.Interfaces()
 	for _, valInterface := range interfaces {
-		//fmt.Println(valInterface.Name)
 		if strings.HasPrefix(valInterface.Name, "eth0") {
 			direcciones, _ := valInterface.Addrs()
 			for _, valDireccion := range direcciones {
 				switch d := valDireccion.(type) {
 				case *net.IPNet:
 					if d.IP.To4() != nil {
-						//fmt.Println(d.IP.To4())
 						dirIP = d.IP.String()
 					}
 				}
-
-				//fmt.Println(valDireccion.String())
 			}
 		}
 	}
 	return dirIP
 }
+
 func servicioHP() {
-	//modo escucha
+	// Modo escucha
 	localDir := fmt.Sprintf("%s:%d", hostIP, portHP)
 
-	ln, _ := net.Listen("tcp", localDir)
+	ln, err := net.Listen("tcp", localDir)
+	if err != nil {
+		fmt.Printf("Error al iniciar el servicio HP: %v\n", err)
+		return
+	}
 	defer ln.Close()
+
+	fmt.Printf("Servicio HP escuchando en %s\n", localDir)
 	for {
-		con, _ := ln.Accept()
+		con, err := ln.Accept()
+		if err != nil {
+			fmt.Printf("Error aceptando conexión: %v\n", err)
+			continue
+		}
 		go handlerHP(con)
 	}
-
 }
+
 func handlerHP(con net.Conn) {
-	defer con.Close()
+	defer func() {
+		fmt.Println("Conexión cerrada con el servidor.")
+		con.Close()
+	}()
 
-	strNum, _ := bufio.NewReader(con).ReadString('\n')
-	fmt.Println(strNum)
-	num, _ := strconv.Atoi(strings.TrimSpace(strNum))
-	fmt.Printf("Recibimos el %d\n", num)
-	/*if num == 0 {
-		fmt.Println("Perdimos!!!!!")
-	} else {
-		enviarHP(num - 1)
-	}*/
+	scanner := bufio.NewScanner(con)
+	clientData := ClientData{
+		TargetUserID: "",
+		Data:         make([]Rating, 0),
+	}
+
+	// Recibir y procesar data del servidor
+	fmt.Println("Recibiendo datos del servidor...")
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "UserID:") {
+			clientData.TargetUserID = strings.TrimSpace(line[len("UserID:"):])
+		} else {
+			fields := strings.Split(line, ",")
+			if len(fields) == 3 {
+				userID, err1 := strconv.Atoi(strings.TrimSpace(fields[0]))
+				movieID, err2 := strconv.Atoi(strings.TrimSpace(fields[1]))
+				rating, err3 := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
+				if err1 == nil && err2 == nil && err3 == nil {
+					clientData.Data = append(clientData.Data, Rating{
+						UserID:  userID,
+						MovieID: movieID,
+						Rating:  rating,
+					})
+				} else {
+					fmt.Println("Error procesando línea:", line)
+				}
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error leyendo del servidor:", err)
+	}
+
+	fmt.Println("\nData recibida del servidor:")
+	fmt.Printf("UserID objetivo: %s\n", clientData.TargetUserID)
+
+	// Mostrar los primeros elementos del array recibido
+	fmt.Printf("Cantidad total de elementos: %d\n", len(clientData.Data))
+	fmt.Println("Primeros 5 elementos:")
+	for i, rating := range clientData.Data {
+		if i >= 5 {
+			break
+		}
+		fmt.Printf("UserID: %d, MovieID: %d, Rating: %.2f\n", rating.UserID, rating.MovieID, rating.Rating)
+	}
 }
-
-/*func enviarHP(num int) {
-	idx := rand.Intn(len(addrs)) //obtener el indice del próximo IP a enviar el número
-	fmt.Println(idx)
-	fmt.Printf("Enviando %d a %s\n", num, addrs[idx])
-	remoteDir := fmt.Sprintf("%s:%d", addrs[idx], portHP)
-	conn, _ := net.Dial("tcp", remoteDir)
-	defer conn.Close()
-	fmt.Fprintln(conn, num)
-}*/
