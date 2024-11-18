@@ -10,7 +10,7 @@ services:
       - nodo2
     networks:
       my_network:
-        ipv4_address: 172.20.0.2
+        ipv4_address: 172.30.0.2
   nodo2:
     build:
       context: ./nodo2
@@ -21,7 +21,7 @@ services:
       - nodo3
     networks:
       my_network:
-        ipv4_address: 172.20.0.3
+        ipv4_address: 172.30.0.3
   nodo3:
     build:
       context: ./nodo3
@@ -30,21 +30,21 @@ services:
       - "39002:9002"    
     networks:
       my_network:
-        ipv4_address: 172.20.0.4
+        ipv4_address: 172.30.0.4
   server:
     build:
       context: ./NodoServer
       dockerfile: Dockerfile
     volumes:
-      - ./dataset2M.csv:/app/dataset2M.csv
+      - ./dataset.csv:/app/dataset.csv
     ports:
       - "49002:9002"    
     networks:
       my_network:
-        ipv4_address: 172.20.0.5
+        ipv4_address: 172.30.0.5
 networks:
   my_network:
     driver: bridge
     ipam:
       config:
-        - subnet: "172.20.0.0/24"
+        - subnet: "172.30.0.0/24"

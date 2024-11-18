@@ -8,8 +8,10 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,10 +26,20 @@ type ClientData struct {
 	Data   []Rating
 }
 
-var hostIP string
-var addrs []string
-var dataset map[string][]Rating
-var numNodes = 3
+type Recommendation struct {
+	MovieID string
+	Rating  float64
+}
+
+var (
+	hostIP      string
+	addrs       []string
+	dataset     map[string][]Rating
+	numNodes    = 3
+	topGlobal   []Recommendation
+	muTopGlobal sync.Mutex
+	wg          sync.WaitGroup
+)
 
 // Servicios
 const (
@@ -40,17 +52,17 @@ func main() {
 	fmt.Printf("IP del Servidor: %s\n", hostIP)
 
 	addrs = []string{
-		"172.20.0.2", "172.20.0.3", "172.20.0.4"}
+		"172.30.0.2", "172.30.0.3", "172.30.0.4"}
 
 	// Cargar el dataset
 	var err error
-	dataset, err = loadDataset("/app/dataset2M.csv", 100)
+	dataset, err = loadDataset("/app/dataset.csv", 2000000)
 	if err != nil {
 		log.Fatalf("Error cargando el dataset: %v", err)
 	}
 	fmt.Println("Dataset cargado correctamente.")
 
-	targetUserID := "30878"
+	targetUserID := "589967"
 
 	targetUserRatings, exists := dataset[targetUserID]
 	if !exists {
@@ -176,7 +188,6 @@ func enviarDatos(clientData []ClientData) {
 
 // Iniciar servidor
 func iniciarServidor(clientData []ClientData) {
-	// Dirección local en la que escucha el servidor
 	localDir := fmt.Sprintf("%s:%d", hostIP, portHP)
 
 	ln, err := net.Listen("tcp", localDir)
@@ -192,31 +203,146 @@ func iniciarServidor(clientData []ClientData) {
 
 	enviarDatos(clientData)
 
-	for {
-		con, err := ln.Accept()
-		if err != nil {
-			fmt.Printf("Error aceptando conexión: %v\n", err)
-			continue
-		}
-		go manejarConexion(con)
+	for i := 0; i < numNodes; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			con, err := ln.Accept()
+			if err != nil {
+				fmt.Printf("Error aceptando conexión: %v\n", err)
+				return
+			}
+			manejarConexion(con)
+		}()
 	}
+
+	wg.Wait()
+
+	// Calcular el Top 3 final
+	calcularTop3Final()
 }
 
 // Manejar conexiones de los clientes
 func manejarConexion(con net.Conn) {
 	defer con.Close()
 
-	// Leer datos enviados por el cliente
-	mensaje, err := bufio.NewReader(con).ReadString('\n')
-	if err != nil {
-		fmt.Printf("Error leyendo datos: %v\n", err)
-		return
+	reader := bufio.NewReader(con)
+	tempResults := []Recommendation{}
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			fmt.Printf("Error leyendo datos: %v\n", err)
+			return
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "FIN_TOP5" {
+			fmt.Println("Fin del Top 5 recibido.")
+			break
+		}
+
+		parts := strings.Split(line, ",")
+		if len(parts) != 2 {
+			fmt.Printf("Datos no válidos: %s\n", line)
+			continue
+		}
+
+		movieID := parts[0]
+		rating, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			fmt.Printf("Error al parsear el rating: %v\n", err)
+			continue
+		}
+
+		tempResults = append(tempResults, Recommendation{
+			MovieID: movieID,
+			Rating:  rating,
+		})
 	}
 
-	fmt.Println(mensaje)
+	// Actualizar el Top Global
+	actualizarTopGlobal(tempResults)
+}
 
-	// Procesar y responder al cliente
-	/*res := con.RemoteAddr().String()
-	fmt.Printf("Mensaje recibido de %s: %s\n", res, strings.TrimSpace(mensaje))
-	fmt.Fprintln(con, "Respuesta del servidor: Recibido")*/
+func actualizarTopGlobal(tempResults []Recommendation) {
+	muTopGlobal.Lock()
+	defer muTopGlobal.Unlock()
+
+	// Mapa para calcular promedios
+	ratingMap := make(map[string][]float64)
+
+	// Incluir las películas ya existentes
+	for _, rec := range topGlobal {
+		ratingMap[rec.MovieID] = append(ratingMap[rec.MovieID], rec.Rating)
+	}
+
+	// Agregar las nuevas recomendaciones
+	for _, rec := range tempResults {
+		ratingMap[rec.MovieID] = append(ratingMap[rec.MovieID], rec.Rating)
+	}
+
+	// Construir el nuevo Top Global
+	newTopGlobal := []Recommendation{}
+	for movieID, ratings := range ratingMap {
+		// Si el rating tiene más de una entrada, promediamos
+		newTopGlobal = append(newTopGlobal, Recommendation{
+			MovieID: movieID,
+			Rating:  promedio(ratings),
+		})
+	}
+
+	// Ordenar por rating descendente
+	sort.Slice(newTopGlobal, func(i, j int) bool {
+		return newTopGlobal[i].Rating > newTopGlobal[j].Rating
+	})
+
+	// Limitar a los Top 15
+	if len(newTopGlobal) > 15 {
+		newTopGlobal = newTopGlobal[:15]
+	}
+
+	topGlobal = newTopGlobal
+	fmt.Println("Top Global actualizado:", topGlobal)
+}
+
+func calcularTop3Final() {
+	muTopGlobal.Lock()
+	defer muTopGlobal.Unlock()
+
+	// Si hay más de 3, limitar a 3
+	if len(topGlobal) > 3 {
+		// Tomamos solo las primeras 3 recomendaciones
+		topGlobal = topGlobal[:3]
+
+		// Promediamos los ratings de las películas repetidas
+		seenMovies := make(map[string][]float64)
+		for _, rec := range topGlobal {
+			seenMovies[rec.MovieID] = append(seenMovies[rec.MovieID], rec.Rating)
+		}
+
+		// Reemplazar los ratings por el promedio si hay duplicados
+		for i, rec := range topGlobal {
+			if len(seenMovies[rec.MovieID]) > 1 {
+				topGlobal[i].Rating = promedio(seenMovies[rec.MovieID])
+			}
+		}
+	}
+
+	// Mostrar el Top 3 con el formato solicitado
+	fmt.Println("Top 3 final:")
+	for _, rec := range topGlobal {
+		fmt.Printf("MovieID: %s, Predicted Rating: %.2f\n", rec.MovieID, rec.Rating)
+	}
+}
+
+func promedio(nums []float64) float64 {
+	sum := 0.0
+	for _, num := range nums {
+		sum += num
+	}
+	return sum / float64(len(nums))
 }
