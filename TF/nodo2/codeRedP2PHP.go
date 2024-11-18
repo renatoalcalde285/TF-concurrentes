@@ -111,8 +111,8 @@ func handlerHP(con net.Conn) {
 			if len(fields) == 3 {
 				userID := strings.TrimSpace(fields[0])
 				movieID := strings.TrimSpace(fields[1])
-				rating, err3 := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
-				if err3 == nil {
+				rating, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
+				if err == nil {
 					clientData.Data = append(clientData.Data, Rating{
 						UserID:  userID,
 						MovieID: movieID,
@@ -170,18 +170,37 @@ func handlerHP(con net.Conn) {
 		}
 	}
 
-	// Enviar el Top 5 al servidor
-	enviarTop5(con, sortedRecommendations[:5])
+	// Enviar las recomendaciones al servidor
+	enviarRecomendacionesAlServidor(sortedRecommendations[:5])
 
 	// Mostrar el largo de las recomendaciones
 	fmt.Printf("\nCantidad total de recomendaciones generadas: %d\n", len(recommendations))
 }
 
-// Función para enviar el Top 5 de recomendaciones al servidor
-func enviarTop5(conn net.Conn, top5 []recommendationPair) {
-	for _, rec := range top5 {
-		// Enviar cada recomendación (MovieID y Rating) al servidor
+func enviarRecomendacionesAlServidor(recommendations []recommendationPair) {
+	serverAddr := fmt.Sprintf("%s:%d", addrs[0], portHP)
+	conn, err := net.Dial("tcp", serverAddr)
+	if err != nil {
+		fmt.Printf("Error conectando con el servidor: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Println("Enviando las recomendaciones al servidor...")
+	for _, rec := range recommendations {
+		// Enviar cada recomendación en formato "MovieID,PredictedRating"
 		fmt.Fprintf(conn, "%s,%.2f\n", rec.MovieID, rec.Rating)
+	}
+	// Indicar fin de las recomendaciones
+	fmt.Fprintln(conn, "FIN_TOP5")
+	fmt.Println("Recomendaciones enviadas al servidor.")
+}
+
+// Función para enviar el Top 5 de recomendaciones al servidor
+func enviarTop3(conn net.Conn, top3 []recommendationPair) {
+	for _, rec := range top3 {
+		fmt.Fprintf(conn, "%s,%.2f\n", rec.MovieID, rec.Rating)
+		fmt.Fprintln(conn, "FIN_TOP5")
 	}
 }
 
