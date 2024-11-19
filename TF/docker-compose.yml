@@ -31,12 +31,30 @@ services:
     networks:
       my_network:
         ipv4_address: 172.30.0.4
+  nodo4:
+    build:
+      context: ./nodo4
+      dockerfile: Dockerfile
+    ports:
+      - "59002:9002"    
+    networks:
+      my_network:
+        ipv4_address: 172.30.0.6
+  nodo5:
+    build:
+      context: ./nodo5
+      dockerfile: Dockerfile
+    ports:
+      - "59003:9002"    
+    networks:
+      my_network:
+        ipv4_address: 172.30.0.7
   server:
     build:
       context: ./NodoServer
       dockerfile: Dockerfile
     volumes:
-      - ./dataset.csv:/app/dataset.csv
+      - ./dataset2M.csv:/app/dataset2M.csv
     ports:
       - "49002:9002"    
     networks:

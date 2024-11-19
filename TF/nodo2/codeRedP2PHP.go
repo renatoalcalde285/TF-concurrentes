@@ -29,7 +29,6 @@ type recommendationPair struct {
 var addrs []string
 var hostIP string
 
-// Servicios
 const (
 	portHP = 9002
 )
@@ -127,12 +126,9 @@ func handlerHP(con net.Conn) {
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error leyendo datos:", err)
 	}
-
-	// Mostrar la data recibida
 	fmt.Println("\nData recibida del cliente:")
 	fmt.Printf("UserID objetivo: %s\n", clientData.TargetUserID)
 
-	// Crear la matriz usuario-item
 	userItemMatrix := createUserItemMatrix(clientData)
 
 	// Realizar la factorización de la matriz
@@ -140,10 +136,7 @@ func handlerHP(con net.Conn) {
 	numFactors := 3
 	learningRate := 0.01
 	numIterations := 10
-
 	userFactors, itemFactors := matrixFactorizationWithSGD(userItemMatrix, numFactors, learningRate, numIterations)
-
-	// Calcular y obtener las recomendaciones
 	recommendations := calculateRecommendations(clientData.TargetUserID, userItemMatrix, userFactors, itemFactors)
 
 	var sortedRecommendations []recommendationPair
@@ -153,13 +146,9 @@ func handlerHP(con net.Conn) {
 			Rating:  score,
 		})
 	}
-
-	// Ordenar las recomendaciones de mayor a menor rating
 	sort.Slice(sortedRecommendations, func(i, j int) bool {
 		return sortedRecommendations[i].Rating > sortedRecommendations[j].Rating
 	})
-
-	// Mostrar las primeras 5 recomendaciones ordenadas
 	fmt.Println("\nPrimeras 5 recomendaciones ordenadas:")
 	count := 0
 	for _, rec := range sortedRecommendations {
@@ -169,11 +158,7 @@ func handlerHP(con net.Conn) {
 			break
 		}
 	}
-
-	// Enviar las recomendaciones al servidor
 	enviarRecomendacionesAlServidor(sortedRecommendations[:5])
-
-	// Mostrar el largo de las recomendaciones
 	fmt.Printf("\nCantidad total de recomendaciones generadas: %d\n", len(recommendations))
 }
 
@@ -188,17 +173,14 @@ func enviarRecomendacionesAlServidor(recommendations []recommendationPair) {
 
 	fmt.Println("Enviando las recomendaciones al servidor...")
 	for _, rec := range recommendations {
-		// Enviar cada recomendación en formato "MovieID,PredictedRating"
 		fmt.Fprintf(conn, "%s,%.2f\n", rec.MovieID, rec.Rating)
 	}
-	// Indicar fin de las recomendaciones
 	fmt.Fprintln(conn, "FIN_TOP5")
 	fmt.Println("Recomendaciones enviadas al servidor.")
 }
 
-// Función para enviar el Top 5 de recomendaciones al servidor
-func enviarTop3(conn net.Conn, top3 []recommendationPair) {
-	for _, rec := range top3 {
+func enviarTop5(conn net.Conn, top5 []recommendationPair) {
+	for _, rec := range top5 {
 		fmt.Fprintf(conn, "%s,%.2f\n", rec.MovieID, rec.Rating)
 		fmt.Fprintln(conn, "FIN_TOP5")
 	}
@@ -220,7 +202,6 @@ func matrixFactorizationWithSGD(matrix map[string]map[string]float64, numFactors
 	userFactors := make(map[string][]float64)
 	itemFactors := make(map[string][]float64)
 
-	// Inicialización de factores aleatorios para usuarios
 	for userID := range matrix {
 		factors := make([]float64, numFactors)
 		for i := 0; i < numFactors; i++ {
@@ -229,7 +210,6 @@ func matrixFactorizationWithSGD(matrix map[string]map[string]float64, numFactors
 		userFactors[userID] = factors
 	}
 
-	// Inicialización de factores aleatorios para ítems (películas)
 	itemSet := make(map[string]bool)
 	for _, movies := range matrix {
 		for movieID := range movies {
@@ -245,21 +225,14 @@ func matrixFactorizationWithSGD(matrix map[string]map[string]float64, numFactors
 		itemFactors[movieID] = factors
 	}
 
-	// Entrenamiento con SGD
 	for iter := 0; iter < numIterations; iter++ {
 		for userID, movies := range matrix {
 			for movieID, actualRating := range movies {
 				// Predicción de calificación
 				predictedRating := predictRating(userFactors[userID], itemFactors[movieID])
-
-				// Error entre la calificación real y la predicha
 				error := actualRating - predictedRating
-
-				// Actualización de factores
 				for k := 0; k < numFactors; k++ {
-					// Ajuste para factores del usuario
 					userFactors[userID][k] += learningRate * error * itemFactors[movieID][k]
-					// Ajuste para factores del ítem
 					itemFactors[movieID][k] += learningRate * error * userFactors[userID][k]
 				}
 			}
@@ -284,7 +257,6 @@ func calculateRecommendations(targetUserID string, userItemMatrix map[string]map
 	// Generar recomendaciones para el usuario objetivo
 	for movieID := range itemFactors {
 		if _, rated := userItemMatrix[targetUserID][movieID]; !rated {
-			// Calcular predicción
 			predictedRating := predictRating(userFactors[targetUserID], itemFactors[movieID])
 			recommendations[movieID] = predictedRating
 		}
