@@ -35,13 +35,12 @@ var (
 	hostIP      string
 	addrs       []string
 	dataset     map[string][]Rating
-	numNodes    = 3
+	numNodes    = 5
 	topGlobal   []Recommendation
 	muTopGlobal sync.Mutex
 	wg          sync.WaitGroup
 )
 
-// Servicios
 const (
 	portHP = 9002
 )
@@ -52,11 +51,11 @@ func main() {
 	fmt.Printf("IP del Servidor: %s\n", hostIP)
 
 	addrs = []string{
-		"172.30.0.2", "172.30.0.3", "172.30.0.4"}
+		"172.30.0.2", "172.30.0.3", "172.30.0.4", "172.30.0.6", "172.30.0.7"}
 
 	// Cargar el dataset
 	var err error
-	dataset, err = loadDataset("/app/dataset.csv", 2000000)
+	dataset, err = loadDataset("/app/dataset2M.csv", 2000000)
 	if err != nil {
 		log.Fatalf("Error cargando el dataset: %v", err)
 	}
@@ -69,12 +68,10 @@ func main() {
 		log.Fatalf("El UserID %s no existe en el dataset", targetUserID)
 	}
 
-	// Dividir el dataset
 	clientData, targetCount := splitDataset(dataset, targetUserRatings, numNodes)
 
 	fmt.Printf("Se encontraron %d elementos para el usuario objetivo %s\n", targetCount, targetUserID)
 
-	// Mostrar los primeros elementos de cada subconjunto
 	for i, data := range clientData {
 		fmt.Printf("\nSubconjunto %d tiene %d elementos.\n", i+1, len(data.Data))
 		fmt.Printf("Primeros 5 valores del cliente %d:\n", i+1)
@@ -107,7 +104,6 @@ func descubrirIP() string {
 	return dirIP
 }
 
-// Cargar dataset
 func loadDataset(filename string, limit int) (map[string][]Rating, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -177,7 +173,6 @@ func enviarDatos(clientData []ClientData) {
 		}
 		defer conn.Close()
 
-		// Enviar datos al cliente
 		fmt.Fprintf(conn, "UserID: %s\n", clientData[i].UserID)
 		for _, rating := range clientData[i].Data {
 			fmt.Fprintf(conn, "%s,%s,%.2f\n", rating.UserID, rating.MovieID, rating.Rating)
@@ -186,7 +181,6 @@ func enviarDatos(clientData []ClientData) {
 	}
 }
 
-// Iniciar servidor
 func iniciarServidor(clientData []ClientData) {
 	localDir := fmt.Sprintf("%s:%d", hostIP, portHP)
 
@@ -218,11 +212,9 @@ func iniciarServidor(clientData []ClientData) {
 
 	wg.Wait()
 
-	// Calcular el Top 3 final
 	calcularTop3Final()
 }
 
-// Manejar conexiones de los clientes
 func manejarConexion(con net.Conn) {
 	defer con.Close()
 
@@ -264,7 +256,6 @@ func manejarConexion(con net.Conn) {
 		})
 	}
 
-	// Actualizar el Top Global
 	actualizarTopGlobal(tempResults)
 }
 
@@ -272,35 +263,28 @@ func actualizarTopGlobal(tempResults []Recommendation) {
 	muTopGlobal.Lock()
 	defer muTopGlobal.Unlock()
 
-	// Mapa para calcular promedios
 	ratingMap := make(map[string][]float64)
 
-	// Incluir las películas ya existentes
 	for _, rec := range topGlobal {
 		ratingMap[rec.MovieID] = append(ratingMap[rec.MovieID], rec.Rating)
 	}
 
-	// Agregar las nuevas recomendaciones
 	for _, rec := range tempResults {
 		ratingMap[rec.MovieID] = append(ratingMap[rec.MovieID], rec.Rating)
 	}
 
-	// Construir el nuevo Top Global
 	newTopGlobal := []Recommendation{}
 	for movieID, ratings := range ratingMap {
-		// Si el rating tiene más de una entrada, promediamos
 		newTopGlobal = append(newTopGlobal, Recommendation{
 			MovieID: movieID,
 			Rating:  promedio(ratings),
 		})
 	}
 
-	// Ordenar por rating descendente
 	sort.Slice(newTopGlobal, func(i, j int) bool {
 		return newTopGlobal[i].Rating > newTopGlobal[j].Rating
 	})
 
-	// Limitar a los Top 15
 	if len(newTopGlobal) > 15 {
 		newTopGlobal = newTopGlobal[:15]
 	}
@@ -313,18 +297,14 @@ func calcularTop3Final() {
 	muTopGlobal.Lock()
 	defer muTopGlobal.Unlock()
 
-	// Si hay más de 3, limitar a 3
 	if len(topGlobal) > 3 {
-		// Tomamos solo las primeras 3 recomendaciones
 		topGlobal = topGlobal[:3]
 
-		// Promediamos los ratings de las películas repetidas
 		seenMovies := make(map[string][]float64)
 		for _, rec := range topGlobal {
 			seenMovies[rec.MovieID] = append(seenMovies[rec.MovieID], rec.Rating)
 		}
 
-		// Reemplazar los ratings por el promedio si hay duplicados
 		for i, rec := range topGlobal {
 			if len(seenMovies[rec.MovieID]) > 1 {
 				topGlobal[i].Rating = promedio(seenMovies[rec.MovieID])
@@ -332,7 +312,6 @@ func calcularTop3Final() {
 		}
 	}
 
-	// Mostrar el Top 3 con el formato solicitado
 	fmt.Println("Top 3 final:")
 	for _, rec := range topGlobal {
 		fmt.Printf("MovieID: %s, Predicted Rating: %.2f\n", rec.MovieID, rec.Rating)
