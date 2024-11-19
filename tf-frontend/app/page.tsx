@@ -3,30 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-interface NodeSliderProps {
-  nodeAmount: number;
-  setNodeAmount: (value: number) => void;
-}
-
-const NodeSlider = ({ nodeAmount, setNodeAmount }: NodeSliderProps) => {
-  return (
-    <div className="flex flex-col items-center">
-      <label htmlFor="node-slider" className="mb-2 text-lg font-semibold">
-        Select Node Amount: {nodeAmount}
-      </label>
-      <input
-        id="node-slider"
-        type="range"
-        min="1"
-        max="5"
-        value={nodeAmount}
-        onChange={(e) => setNodeAmount(Number(e.target.value))}
-        className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-[#935AD8]"
-      />
-    </div>
-  );
-};
-
 export default function HomePage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
@@ -43,14 +19,16 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col gap-10">
-      <NodeSlider nodeAmount={nodeAmount} setNodeAmount={setNodeAmount} />
+    <div className="flex flex-col gap-4">
+      <h1 className="text-3xl font-bold lg:text-4xl">
+         ¡Tu próxima película favorita te espera!
+      </h1>
       <input
         type="text"
         value={userId}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Ingrese ID"
+        placeholder="Ingrese su userID"
         className="py-3 px-5 rounded-3xl border-2 focus:border-[#CBC5EA] outline-none shadow-md text-center font-bold text-xl"
       />
     </div>

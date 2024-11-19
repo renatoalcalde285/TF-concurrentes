@@ -29,21 +29,30 @@ export default function ResultsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const userId = searchParams.get("userId");
 
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
+        setLoading(true);
         const response = await fetch(
           `http://localhost:8080/recommend?userId=${userId}`
         );
         if (!response.ok) {
-          throw new Error("Failed to fetch recommendations");
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to fetch recommendations");
         }
         const data = await response.json();
         setRecommendations(data.recommendations);
-      } catch (error) {
-        console.error("Error fetching recommendations:", error);
+        setLoading(false);
+      } catch (error: any) {
+        setErrorMessage(
+          error.message ||
+            "Lo sentimos, no pudimos obtener las recomendaciones. Por favor, inténtalo de nuevo."
+        );
+        setLoading(false);
       }
     };
 
@@ -55,21 +64,36 @@ export default function ResultsPage() {
   const handleReturn = () => {
     router.push("/");
   };
-  //Here
+
+  // Here
   return (
     <div className="flex flex-col items-center gap-16 w-2/3">
-      <h1 className="text-3xl lg:text-4xl">
-        Bienvenid@ <span className="font-bold">{userId}</span>, te recomendamos:
-      </h1>
-      <div className="flex justify-center w-full gap-6">
-        {recommendations.map((rec) => (
-          <ResultCard
-            key={rec.MovieID}
-            movieId={rec.MovieID}
-            score={rec.Rating}
-          />
-        ))}
-      </div>
+      {!errorMessage && (
+        <h1 className="text-3xl lg:text-4xl">
+          Bienvenid@ <span className="font-bold">{userId}</span>, te
+          recomendamos:
+        </h1>
+      )}
+      {loading ? (
+        <p className="text-xl lg:text-2xl">
+          Estamos buscando recomendaciones para ti...
+        </p>
+      ) : errorMessage ? (
+        <p className="text-red-500 text-xl lg:text-2xl">
+          No pudimos encontrar a {userId} en nuestra base de datos, porfavor
+          probar con otro userID
+        </p>
+      ) : (
+        <div className="flex justify-center w-full gap-6">
+          {recommendations.map((rec) => (
+            <ResultCard
+              key={rec.MovieID}
+              movieId={rec.MovieID}
+              score={rec.Rating}
+            />
+          ))}
+        </div>
+      )}
       <div
         className="bg-[#CBC5EA] p-4 rounded-full border self-start hover:cursor-pointer hover:shadow-[0_0_6px_6px_rgba(203,197,234,0.6)] transition-shadow duration-300"
         onClick={handleReturn}
