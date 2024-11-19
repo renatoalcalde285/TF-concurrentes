@@ -4,6 +4,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import Papa from "papaparse";
 
 interface Recommendation {
   MovieID: string;
@@ -11,16 +12,16 @@ interface Recommendation {
 }
 
 export const ResultCard = ({
-  movieId,
+  movieName,
   score,
 }: {
-  movieId: string;
+  movieName: string;
   score: number;
 }) => {
   return (
-    <div className="flex flex-col gap-2 rounded-xl p-6 bg-white border border-[#CBC5EA]">
-      <p className="text-xl lg:text-3xl font-bold">Película: {movieId}</p>
-      <p className="text-lg lg:text-2xl">Score: {score.toFixed(2)}</p>
+    <div className="flex flex-col gap-2 rounded-xl p-6 bg-white border border-[#CBC5EA] flex-1">
+      <p className="text-lg lg:text-3xl font-bold"> {movieName}</p>
+      <p className="text-lg lg:text-2xl mt-auto">Score: {score.toFixed(2)}</p>
     </div>
   );
 };
@@ -31,12 +32,51 @@ export default function ResultsPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [movieMap, setMovieMap] = useState<{ [key: string]: string }>({});
   const userId = searchParams.get("userId");
+
+  const [movieDataLoaded, setMovieDataLoaded] = useState<boolean>(false);
+  const [recommendationsLoaded, setRecommendationsLoaded] =
+    useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchMovieData = async () => {
+      try {
+        const response = await fetch("/movieData.csv");
+        const csvData = await response.text();
+
+        Papa.parse(csvData, {
+          delimiter: ",",
+          skipEmptyLines: true,
+          complete: (results) => {
+            const data = results.data as string[][];
+            const map: { [key: string]: string } = {};
+            data.forEach((row) => {
+              const [movieID, year, name] = row;
+              map[movieID] = name;
+            });
+            setMovieMap(map);
+            setMovieDataLoaded(true);
+          },
+          error: (error: any) => {
+            console.error("Error parsing CSV:", error);
+            setErrorMessage("Error loading movie data.");
+            setLoading(false);
+          },
+        });
+      } catch (error) {
+        console.error("Error fetching movie data:", error);
+        setErrorMessage("Error fetching movie data.");
+        setLoading(false);
+      }
+    };
+
+    fetchMovieData();
+  }, []);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        setLoading(true);
         const response = await fetch(
           `http://localhost:8080/recommend?userId=${userId}`
         );
@@ -46,8 +86,9 @@ export default function ResultsPage() {
         }
         const data = await response.json();
         setRecommendations(data.recommendations);
-        setLoading(false);
+        setRecommendationsLoaded(true);
       } catch (error: any) {
+        console.error("Error fetching recommendations:", error);
         setErrorMessage(
           error.message ||
             "Lo sentimos, no pudimos obtener las recomendaciones. Por favor, inténtalo de nuevo."
@@ -61,17 +102,22 @@ export default function ResultsPage() {
     }
   }, [userId]);
 
+  useEffect(() => {
+    if (movieDataLoaded && recommendationsLoaded) {
+      setLoading(false);
+    }
+  }, [movieDataLoaded, recommendationsLoaded]);
+
   const handleReturn = () => {
     router.push("/");
   };
 
-  // Here
   return (
     <div className="flex flex-col items-center gap-16 w-2/3">
       {!errorMessage && (
         <h1 className="text-3xl lg:text-4xl">
-          Bienvenid@ <span className="font-bold">{userId}</span>, te
-          recomendamos:
+          Bienvenid@ <span className="font-bold">{userId}</span>,
+          {!loading && " te recomendamos:"}
         </h1>
       )}
       {loading ? (
@@ -80,15 +126,15 @@ export default function ResultsPage() {
         </p>
       ) : errorMessage ? (
         <p className="text-red-500 text-xl lg:text-2xl">
-          No pudimos encontrar a {userId} en nuestra base de datos, porfavor
-          probar con otro userID
+          No pudimos encontrar a <b>{userId}</b> en nuestra base de datos,
+          porfavor probar con otro userID
         </p>
       ) : (
         <div className="flex justify-center w-full gap-6">
           {recommendations.map((rec) => (
             <ResultCard
               key={rec.MovieID}
-              movieId={rec.MovieID}
+              movieName={movieMap[rec.MovieID] || rec.MovieID}
               score={rec.Rating}
             />
           ))}
