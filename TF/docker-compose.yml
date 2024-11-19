@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   nodo1:
     build:
@@ -27,7 +27,7 @@ services:
       context: ./nodo3
       dockerfile: Dockerfile
     ports:
-      - "39002:9002"    
+      - "39002:9002"
     networks:
       my_network:
         ipv4_address: 172.30.0.4
@@ -36,7 +36,7 @@ services:
       context: ./nodo4
       dockerfile: Dockerfile
     ports:
-      - "59002:9002"    
+      - "59002:9002"
     networks:
       my_network:
         ipv4_address: 172.30.0.6
@@ -45,7 +45,7 @@ services:
       context: ./nodo5
       dockerfile: Dockerfile
     ports:
-      - "59003:9002"    
+      - "59003:9002"
     networks:
       my_network:
         ipv4_address: 172.30.0.7
@@ -56,7 +56,8 @@ services:
     volumes:
       - ./dataset2M.csv:/app/dataset2M.csv
     ports:
-      - "49002:9002"    
+      - "49002:9002"
+      - "8080:8080"
     networks:
       my_network:
         ipv4_address: 172.30.0.5

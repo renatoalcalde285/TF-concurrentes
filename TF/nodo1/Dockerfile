@@ -1,8 +1,15 @@
-#IMAGEN BASE
+# Dockerfile for Node
+
 FROM golang:alpine
-#Copiado del fuente a la nueva imagen
-COPY ./codeRedP2PHP.go ./codenodehp-001.go
-#exponer los puertos
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the source code to the container
+COPY ./codeRedP2PHP.go .
+
+# Expose the port
 EXPOSE 9002
-#poner en ejecución el algoritmo
-CMD ["go","run","codenodehp-001.go"]
+
+# Run the node
+CMD ["go", "run", "codeRedP2PHP.go"]

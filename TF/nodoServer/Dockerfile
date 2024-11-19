@@ -1,8 +1,16 @@
-#IMAGEN BASE
+# Dockerfile for Server
+
 FROM golang:alpine
-#Copiado del fuente a la nueva imagen
-COPY ./codeServer.go ./codenodehp-004.go
-#exponer los puertos
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the source code to the container
+COPY ./codeServer.go .
+
+# Expose the ports
 EXPOSE 9002
-#poner en ejecución el algoritmo
-CMD ["go","run","codenodehp-004.go"]
+EXPOSE 8080
+
+# Run the server
+CMD ["go", "run", "codeServer.go"]
